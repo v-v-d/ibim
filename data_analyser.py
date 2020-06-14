@@ -28,6 +28,12 @@ def get_df_with_split_column(df, col_name, *new_col_names):
     return df
 
 
+def get_timedelta(raw_from_date, raw_to_date):
+    from_date = pd.to_datetime(raw_from_date, format='%d.%m.%Y %H:%M:%S')
+    to_date = pd.to_datetime(raw_to_date, format='%d.%m.%Y %H:%M:%S')
+    return to_date - from_date
+
+
 def load_df_to_excel(output_filepath, df_resolver):
     with pd.ExcelWriter(output_filepath) as writer:
         for sheet_name, df in df_resolver.items():
@@ -115,6 +121,87 @@ if __name__ == '__main__':
 
     df_resolver.update({
         'persons_with_bad_names': persons_with_bad_names_df,
+    })
+
+    # Sort persons by contacts count
+    contacts_big_fpath = os.path.join('source', 'big_data_contracts.json')
+    contacts_df = pd.read_json(contacts_big_fpath)
+
+    filtered_by_time_df = contacts_df.groupby(['Member1_ID'], group_keys=False).apply(
+        lambda group: group[get_timedelta(group['From'], group['To']) > pd.Timedelta(minutes=5)]
+    )
+
+    filtered_and_sorted_df = (
+        filtered_by_time_df.groupby(['Member1_ID'])
+        .size()
+        .reset_index(name='ContactsCount')
+        .sort_values(['ContactsCount'], ascending=False)
+    )
+
+    joined_sorted_df = pd.merge(
+        filtered_and_sorted_df, all_persons_df, how='left',
+        left_on=['Member1_ID'], right_on=['ID']
+    ).drop(['Member1_ID', 'ID', 'Age'], axis=1)
+
+    df_resolver.update({
+        'contacts_count': joined_sorted_df,
+    })
+
+    # Sort by total contacts duration
+    total_times_series = (
+        contacts_df.groupby(['Member1_ID'])
+        .apply(
+            lambda group: sum(
+                [get_timedelta(row['From'], row['To']) for _, row in group.iterrows()],
+                pd.Timedelta(0)
+            )
+        )
+        .sort_values(ascending=False)
+    )
+
+    total_times_df = pd.DataFrame({
+        'Member1_ID': total_times_series.index,
+        'Time': total_times_series.values
+    })
+
+    joined_times_df = pd.merge(
+        total_times_df, all_persons_df, how='left',
+        left_on=['Member1_ID'], right_on=['ID']
+    ).drop(['Member1_ID', 'ID', 'Age'], axis=1)
+
+    df_resolver.update({
+        'total_contacts_duration': joined_sorted_df,
+    })
+
+    # Find age group with most common contacts
+    # Assume that the most common contact is from 0.75max to max.
+    filtered_and_sorted_df = (
+        pd.merge(
+            filtered_and_sorted_df, all_persons_df, how='left',
+            left_on=['Member1_ID'], right_on=['ID']
+        )
+        .drop(['Member1_ID', 'ID'], axis=1)
+    )
+
+    bins = [13, 17, 20, 55, 75, 110]
+    labels = ['Подросток', 'Юноша', 'Зрелый', 'Пожилой', 'Старческий']
+    filtered_and_sorted_df['AgeGroup'] = pd.cut(
+        filtered_and_sorted_df['Age'], bins=bins, labels=labels, right=False
+    )
+
+    filtered_by_contacts_df = (
+        filtered_and_sorted_df.groupby(['ContactsCount'], group_keys=False)
+        .apply(lambda group: group[
+            group['ContactsCount'] >= filtered_and_sorted_df['ContactsCount'].max() * .75
+        ])
+    )
+
+    age_group_df = pd.DataFrame({
+        'AgeGroup': filtered_by_contacts_df['AgeGroup'].mode(),
+    })
+
+    df_resolver.update({
+        'most_common_contacts_age_group': age_group_df,
     })
 
     # load data to excel
