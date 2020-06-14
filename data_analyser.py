@@ -87,6 +87,19 @@ df_resolver.update({
     'unique_persons': unique_data_persons_df,
 })
 
+all_persons_df = pd.concat([
+    df_resolver['big_data_persons'], df_resolver['unique_persons']
+])
+
+age_mask = all_persons_df.groupby(['LastName'])['Age'].transform(
+    lambda ages: [any(abs(age - ages) == 10) for age in ages]
+)
+namesakes_df = all_persons_df.loc[age_mask].sort_values(by=['LastName'])
+
+df_resolver.update({
+    'namesakes_with_age_diff': namesakes_df,
+})
+
 # load data to excel
 if not os.path.exists('result'):
     os.makedirs('result')
