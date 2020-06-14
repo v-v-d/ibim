@@ -100,6 +100,16 @@ df_resolver.update({
     'namesakes_with_age_diff': namesakes_df,
 })
 
+english_chars_mask = (
+    all_persons_df['LastName'].str.contains('[a-zA-Z]', regex=True) |
+    all_persons_df['FirstName'].str.contains('[a-zA-Z]', regex=True)
+)
+persons_with_bad_names_df = all_persons_df.loc[english_chars_mask]
+
+df_resolver.update({
+    'persons_with_bad_names': persons_with_bad_names_df,
+})
+
 # load data to excel
 if not os.path.exists('result'):
     os.makedirs('result')
