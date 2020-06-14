@@ -144,7 +144,7 @@ if __name__ == '__main__':
     ).drop(['Member1_ID', 'ID', 'Age'], axis=1)
 
     df_resolver.update({
-        'persons_with_contacts_count': joined_sorted_df,
+        'contacts_count': joined_sorted_df,
     })
 
     # Sort by total contacts duration
@@ -171,6 +171,37 @@ if __name__ == '__main__':
 
     df_resolver.update({
         'total_contacts_duration': joined_sorted_df,
+    })
+
+    # Find age group with most common contacts
+    # Assume that the most common contact is from 0.75max to max.
+    filtered_and_sorted_df = (
+        pd.merge(
+            filtered_and_sorted_df, all_persons_df, how='left',
+            left_on=['Member1_ID'], right_on=['ID']
+        )
+        .drop(['Member1_ID', 'ID'], axis=1)
+    )
+
+    bins = [13, 17, 20, 55, 75, 110]
+    labels = ['Подросток', 'Юноша', 'Зрелый', 'Пожилой', 'Старческий']
+    filtered_and_sorted_df['AgeGroup'] = pd.cut(
+        filtered_and_sorted_df['Age'], bins=bins, labels=labels, right=False
+    )
+
+    filtered_by_contacts_df = (
+        filtered_and_sorted_df.groupby(['ContactsCount'], group_keys=False)
+        .apply(lambda group: group[
+            group['ContactsCount'] >= filtered_and_sorted_df['ContactsCount'].max() * .75
+        ])
+    )
+
+    age_group_df = pd.DataFrame({
+        'AgeGroup': filtered_by_contacts_df['AgeGroup'].mode(),
+    })
+
+    df_resolver.update({
+        'most_common_contacts_age_group': age_group_df,
     })
 
     # load data to excel
