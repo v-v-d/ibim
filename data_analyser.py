@@ -147,6 +147,32 @@ if __name__ == '__main__':
         'persons_with_contacts_count': joined_sorted_df,
     })
 
+    # Sort by total contacts duration
+    total_times_series = (
+        contacts_df.groupby(['Member1_ID'])
+        .apply(
+            lambda group: sum(
+                [get_timedelta(row['From'], row['To']) for _, row in group.iterrows()],
+                pd.Timedelta(0)
+            )
+        )
+        .sort_values(ascending=False)
+    )
+
+    total_times_df = pd.DataFrame({
+        'Member1_ID': total_times_series.index,
+        'Time': total_times_series.values
+    })
+
+    joined_times_df = pd.merge(
+        total_times_df, all_persons_df, how='left',
+        left_on=['Member1_ID'], right_on=['ID']
+    ).drop(['Member1_ID', 'ID', 'Age'], axis=1)
+
+    df_resolver.update({
+        'total_contacts_duration': joined_sorted_df,
+    })
+
     # load data to excel
     if not os.path.exists('result'):
         os.makedirs('result')
