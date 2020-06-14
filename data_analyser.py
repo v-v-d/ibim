@@ -59,5 +59,9 @@ df_resolver.update({'big_data_persons': big_data_df_split})
 df_resolver['small_data_persons'].sort_values(by=['LastName'], inplace=True)
 df_resolver['big_data_persons'].sort_values(by=['FirstName'], inplace=True)
 
+if not os.path.exists('result'):
+    os.makedirs('result')
+
 output_filepath = os.path.join('result', 'data_persons.xlsx')
+
 load_df_to_excel(output_filepath, df_resolver)
