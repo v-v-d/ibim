@@ -44,12 +44,14 @@ df_resolver = get_df_resolver(
     # contacts_small_fpath, contacts_big_fpath
 )
 
+# Split small_data_persons column 'Name' and update df_resolver
 small_data_df = df_resolver['small_data_persons']
 small_data_df_split = get_df_with_split_column(
     small_data_df, 'Name', 'LastName', 'FirstName'
 )
 df_resolver.update({'small_data_persons': small_data_df_split})
 
+# Split big_data_persons column 'Name' and update df_resolver
 big_data_df = df_resolver['big_data_persons']
 big_data_df_split = get_df_with_split_column(
     big_data_df, 'Name', 'LastName', 'FirstName'
@@ -59,9 +61,35 @@ df_resolver.update({'big_data_persons': big_data_df_split})
 df_resolver['small_data_persons'].sort_values(by=['LastName'], inplace=True)
 df_resolver['big_data_persons'].sort_values(by=['FirstName'], inplace=True)
 
+unique_data_persons_by_last_name_df = (
+    df_resolver['small_data_persons'].merge(
+        df_resolver['big_data_persons'], how='outer', indicator=True,
+        on=['LastName'], suffixes=['', '_']
+        # on=['Age', 'FirstName', 'LastName'], suffixes=['', '_']
+    )
+    .query("_merge=='left_only'")
+    .dropna(how='all', axis=1)
+    .drop(['_merge'], axis=1)
+)
+
+unique_data_persons_df = (
+    df_resolver['small_data_persons'].merge(
+        df_resolver['big_data_persons'], how='outer', indicator=True,
+        on=['Age', 'FirstName', 'LastName'], suffixes=['', '_']
+    )
+    .query("_merge=='left_only'")
+    .dropna(how='all', axis=1)
+    .drop(['_merge'], axis=1)
+)
+
+df_resolver.update({
+    'unique_persons_by_last_name': unique_data_persons_by_last_name_df,
+    'unique_persons': unique_data_persons_df,
+})
+
+# load data to excel
 if not os.path.exists('result'):
     os.makedirs('result')
 
 output_filepath = os.path.join('result', 'data_persons.xlsx')
-
 load_df_to_excel(output_filepath, df_resolver)
