@@ -170,7 +170,7 @@ if __name__ == '__main__':
     ).drop(['Member1_ID', 'ID', 'Age'], axis=1)
 
     df_resolver.update({
-        'total_contacts_duration': joined_sorted_df,
+        'total_contacts_duration': joined_times_df,
     })
 
     # Find age group with most common contacts
