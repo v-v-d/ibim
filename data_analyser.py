@@ -28,6 +28,12 @@ def get_df_with_split_column(df, col_name, *new_col_names):
     return df
 
 
+def get_timedelta(raw_from_date, raw_to_date):
+    from_date = pd.to_datetime(raw_from_date, format='%d.%m.%Y %H:%M:%S')
+    to_date = pd.to_datetime(raw_to_date, format='%d.%m.%Y %H:%M:%S')
+    return to_date - from_date
+
+
 def load_df_to_excel(output_filepath, df_resolver):
     with pd.ExcelWriter(output_filepath) as writer:
         for sheet_name, df in df_resolver.items():
@@ -115,6 +121,30 @@ if __name__ == '__main__':
 
     df_resolver.update({
         'persons_with_bad_names': persons_with_bad_names_df,
+    })
+
+    # Sort persons by contacts count
+    contacts_big_fpath = os.path.join('source', 'big_data_contracts.json')
+    contacts_df = pd.read_json(contacts_big_fpath)
+
+    filtered_by_time_df = contacts_df.groupby(['Member1_ID'], group_keys=False).apply(
+        lambda group: group[get_timedelta(group['From'], group['To']) > pd.Timedelta(minutes=5)]
+    )
+
+    filtered_and_sorted_df = (
+        filtered_by_time_df.groupby(['Member1_ID'])
+        .size()
+        .reset_index(name='ContactsCount')
+        .sort_values(['ContactsCount'], ascending=False)
+    )
+
+    joined_sorted_df = pd.merge(
+        filtered_and_sorted_df, all_persons_df, how='left',
+        left_on=['Member1_ID'], right_on=['ID']
+    ).drop(['Member1_ID', 'ID', 'Age'], axis=1)
+
+    df_resolver.update({
+        'persons_with_contacts_count': joined_sorted_df,
     })
 
     # load data to excel
